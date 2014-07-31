@@ -29,6 +29,10 @@ proxies = {
           "ftp": "http://10.64.8.8:8080",
 }
 
+ib_tky_proxies = {
+        "http": "http://proxy-tky.ib.tmicss.com:8080"
+}
+
 ib_proxies = {
           "http": "http://10.64.1.125:8080"
 }
@@ -90,28 +94,138 @@ class AlexaSpider(object):
 
 class Verifier(object):
     
-    def __init__(self, url):
-        self.url = url
-#         self.proxy = proxy
-#         self.username = username
-#         self.password = password
-        pass
+    def __init__(self, proxy=None, username=None, password=None):
+        self.proxy = proxy
+        self.br = mechanize.Browser()
+        self.username = username
+        self.password = password
+        self.first_url = 'http://www.baidu.com'
     
-    def run_with_mechnize(self, proxy=None, username=None, password=None):
-        br = mechanize.Browser()
-        br.set_handle_equiv(True)
-#br.set_handle_gzip(True)
-        br.set_handle_redirect(True)
-        br.set_handle_referer(True)
-        br.set_handle_robots(False)
+    def run_with_mechanize(self, url_list):
+        self.br = mechanize.Browser()
+        self.br.set_handle_equiv(True)
+        #br.set_handle_gzip(True)
+        self.br.set_handle_redirect(True)
+        self.br.set_handle_referer(True)
+        self.br.set_handle_robots(False)
           
-        br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
+        self.br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
   
-        br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36')]
+        self.br.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36')]
         
-        if proxy is not None:
+        if self.proxy is not None:
+            br = self.br
             try:
-                br.set_proxies(proxy)
+                self.br.set_proxies(self.proxy)
+                r = self.br.open(self.first_url)
+                self.br._factory.is_html = True
+                logger.debug("url: %s", r.geturl())
+                
+                for f in self.br.forms():
+                    logger.debug(f)
+                
+                self.br.select_form(nr=0)
+                self.br.form['username'] = username
+                r = self.br.submit()
+                if r.code != 200:
+                    logger.error("Error when input username: %s", r.code)
+                    
+                self.br._factory.is_html = True
+                logger.debug("url: %s", r.geturl())
+                for f in self.br.forms():
+                    logger.debug(f)
+                           
+                #print "after input username"
+                self.br.select_form(nr=0)
+                self.br.form['password'] = password
+                r = self.br.submit()
+                if r.code != 200:
+                    logger.error("Error when input password: %s", r.code)
+                    
+                self.br._factory.is_html = True
+                
+                #print "after input password"
+                
+                logger.debug("url: %s", r.geturl())
+                logger.debug("header: %s", r.info())
+                logger.debug("response code: %s", r.code)
+                logger.debug("Authentication is done via %s", first_url)
+                #print first_url, r.code, len(r.read()), self.br.title()
+                #return self.url, r.code, len(r.read()), self.br.title()
+            except mechanize.HTTPError as e:
+                logger.debug("HTTP Error status code: %s", e.code)
+                logger.debug("HTTP Error title:%s", self.br.title())
+                #return self.url, e.code, len(r.read()),self.br.title()
+            except mechanize.URLError as e:
+                logger.debug("URLError: %s", e.reason.args)
+                #return self.url, e.reason.args, len(r.read()), self.br.title()
+            except Exception as e:
+                logger.debug("Other Error: %s", e)
+                
+
+        # now auth is ready, continue to do the real stuff
+        for url in url_list:
+            try: 
+                response = self.br.open(url)
+                logger.info("%s: %d -> %s", url, r.code, self.br.title())
+                logger.debug("title: %s", self.br.title())
+                #return self.url, response.code, len(response.read()), br.title() 
+                print "%s: %d -> %s" % (url, r.code, self.br.title())
+            except mechanize.HTTPError as e:
+                logger.debug("HTTP Error status code: %s", e.code)
+                logger.debug("HTTP Error title:%s", self.br.title())
+                print "%s: %d -> %s" % (url, e.code, self.br.title())
+                #return self.url, e.code, len(r.read()),self.br.title()
+            except mechanize.URLError as e:
+                logger.debug("URLError: %s", e.reason.args)
+                print "%s: %d -> %s" % (url, e.reason.args, self.br.title())
+                #return self.url, e.reason.args, len(r.read()), self.br.title()
+            except Exception as e:
+                print "%s: err -> %s" % (url, e)
+                logger.debug("Other Error: %s", e)
+                
+              
+            
+        
+             
+    def run_with_request(self):
+        r = requests.get("http://%s" % self.url, proxies=proxies, headers=headers)
+        data = r.text
+        print len(data)
+        
+    def test(self):
+        s = requests.Session()       
+        r = s.get('http://httpbin.org/cookies/set/sessioncookie/123456789', proxies=iwsaas_proxies, headers=headers)
+        print(r.text)
+#         r = s.get("http://httpbin.org/cookies")
+ 
+
+      
+'''
+class Alaska(Object):
+    def __init__(self, proxy=None):
+        self.br = mechanize.Browser()
+        self.proxy = proxy
+        self.is_authenticated = False
+
+
+    def go(self, url_list):
+        for url in url_list:
+            try:
+                response = self.br.open(url)
+            except Exception, e:
+                logger.error("%s: %s", url, e)
+                print("%s: %s", url, e)
+
+    def auth(self, username, password, ever_first_url='http://www.baidu.com'):
+        # authenticate the user firstly.
+        if self.proxy is not None:
+            br = self.br
+            try:
+                response = br.open(ever_first_url)
+                # input username
+
+                br.set_proxies(self.proxy)
                 r = br.open(self.url)
                 br._factory.is_html = True
                 logger.debug("url: %s", r.geturl())
@@ -145,6 +259,8 @@ class Verifier(object):
                 logger.debug("header: %s", r.info())
                 logger.debug("response code: %s", r.code)
                 print self.url, r.code, len(r.read()), br.title()
+                
+                self.is_authenticated = True
                 return self.url, r.code, len(r.read()), br.title()
             except mechanize.HTTPError as e:
                 logger.debug("HTTP Error status code: %s", e.code)
@@ -154,26 +270,8 @@ class Verifier(object):
                 logger.debug("URLError: %s", e.reason.args)
                 return self.url, e.reason.args, len(r.read()), br.title()
         else:
-            response = br.open(self.url)
-            
-            logger.debug("title: %s", br.title())
-            return self.url, response.code, len(response.read()), br.title() 
-            
-        
-             
-    def run_with_request(self):
-        r = requests.get("http://%s" % self.url, proxies=proxies, headers=headers)
-        data = r.text
-        print len(data)
-        
-    def test(self):
-        s = requests.Session()       
-        r = s.get('http://httpbin.org/cookies/set/sessioncookie/123456789', proxies=iwsaas_proxies, headers=headers)
-        print(r.text)
-#         r = s.get("http://httpbin.org/cookies")
-  
-      
-
+            self.is_authenticated = True
+'''
 
 def get_top_site_list():
     w = AlexaSpider()
@@ -182,12 +280,15 @@ def get_top_site_list():
     # w.topN(500,276)
     w.topN('us', 500)
     
-def check_if_url_blocked(url, username, password):
+def check_if_url_blocked(url_list, proxy, username, password):
     # v = Verifier('www.stackoverflow.com')
-    v = Verifier(url)       
+    v = Verifier(proxy, username, password)       
+    v.run_with_mechanize(url_list)
+
+    '''
     try:
-        m = v.run_with_mechnize(iwsaas_proxies, username, password)
-        n = v.run_with_mechnize()
+        m = v.run_with_mechanize(iwsaas_proxies, username, password)
+        n = v.run_with_mechanize()
         logger.info(n)
         logger.info(m)
 
@@ -203,19 +304,15 @@ def check_if_url_blocked(url, username, password):
             logger.info("%s", e)
             raise e
             #logger.info("%s", traceback.format_exec())
-            
-    
-#     print v.run_with_mechnize()
-
+    '''
 
 def go(url_list, n, step, username, password):
     start = n*step
     stop = (n+1)*step 
     logger.info("checking url range: %d -> %d", start, stop)
-    for url in url_list[start:stop]:
-        check_if_url_blocked(url, username, password)
+    check_if_url_blocked(url_list[start:stop], iwsaas_proxies, username, password)
 
-        
+
 if __name__ == "__main__":
 #     main()
     log_file = sys.argv[1] 
@@ -255,7 +352,4 @@ if __name__ == "__main__":
         thread.join()
 
     print "DONE!"
-
-
-
 
